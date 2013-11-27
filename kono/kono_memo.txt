@@ -1,0 +1,83 @@
+
+ダイクストラ
+	始点の隣接スイッチについて
+		ポートリストでも見ればいいか？
+	ホップ数＋１、どこから来るのかのスイッチを記録
+	それらについて繰り返す
+	終点が見つかったら終焉。バックトラックでフローテーブル更新
+フローテーブル
+	宛先IP → 送信先ポート
+
+動作確認方法
+まずパケットを双方向に送出してフローテーブルを更新
+	trema send_packets --source host1 --dest host2
+	trema send_packets --source host2 --dest host1
+フローテーブルを見る
+	trema dump_flows [表示したいスイッチのDatapath ID]
+
+
+
+
+更新したファイル
+topology-controller.rb
+	packet_in
+	handle_ipv4
+topology.rb
+	attr_reader
+	get_host
+
+
+IPv4 from 192.168.0.1 to 192.168.0.2
+0x1 (port 1) <-> 0x3 (port 1)
+0x1 (port 2) <-> 0x2 (port 3)
+0x2 (port 2) <-> 0x3 (port 2)
+0x2 (port 3) <-> 0x1 (port 2)
+0x3 (port 1) <-> 0x1 (port 1)
+0x3 (port 2) <-> 0x2 (port 2)
+0x1 (port 3) <-> (host 192.168.0.1)
+topology updated
+IPv4 from 192.168.0.2 to 192.168.0.1
+0x1 (port 1) <-> 0x3 (port 1)
+0x1 (port 2) <-> 0x2 (port 3)
+0x2 (port 2) <-> 0x3 (port 2)
+0x2 (port 3) <-> 0x1 (port 2)
+0x3 (port 1) <-> 0x1 (port 1)
+0x3 (port 2) <-> 0x2 (port 2)
+0x1 (port 3) <-> (host 192.168.0.1)
+0x2 (port 1) <-> (host 192.168.0.2)
+topology updated
+IPv4 from 192.168.0.1 to 192.168.0.2
+dijkstra : [0x1 (port 3) <-> (host 192.168.0.1)] -> [0x2 (port 1) <-> (host 192.168.0.2)]
+search link : 0x1 (port 1) <-> 0x3 (port 1)
+switch 1(1) -> switch 3  hop=1   .
+search link : 0x1 (port 2) <-> 0x2 (port 3)
+switch 1(2) -> switch 2  hop=1   .
+search link : 0x3 (port 1) <-> 0x1 (port 1)
+search link : 0x3 (port 2) <-> 0x2 (port 2)
+switch[1] (port 2) -> switch[2]
+IPv4 from 192.168.0.2 to 192.168.0.1
+dijkstra : [0x2 (port 1) <-> (host 192.168.0.2)] -> [0x1 (port 3) <-> (host 192.168.0.1)]
+search link : 0x2 (port 2) <-> 0x3 (port 2)
+switch 2(2) -> switch 3  hop=1   .
+search link : 0x2 (port 3) <-> 0x1 (port 2)
+switch 2(3) -> switch 1  hop=1   .
+search link : 0x3 (port 1) <-> 0x1 (port 1)
+search link : 0x3 (port 2) <-> 0x2 (port 2)
+switch[2] (port 3) -> switch[1]
+
+
+
+trema send_packets --source host1 --dest host2
+trema send_packets --source host2 --dest host1
+trema send_packets --source host1 --dest host2
+の後↓
+
+shiorrys@shiorrys-VirtualBox:~$ trema dump_flows 0x1
+NXST_FLOW reply (xid=0x4):
+ cookie=0x8, duration=6.106s, table=0, n_packets=7, n_bytes=448, priority=65535,udp,in_port=3,vlan_tci=0x0000,dl_src=00:00:00:00:00:01,dl_dst=00:00:00:00:00:02,nw_src=192.168.0.1,nw_dst=192.168.0.2,nw_tos=0,tp_src=1,tp_dst=1 actions=output:2
+shiorrys@shiorrys-VirtualBox:~$ trema dump_flows 0x2
+NXST_FLOW reply (xid=0x4):
+ cookie=0x1, duration=4.878s, table=0, n_packets=0, n_bytes=0, priority=65535,udp,in_port=1,vlan_tci=0x0000,dl_src=00:00:00:00:00:02,dl_dst=00:00:00:00:00:01,nw_src=192.168.0.2,nw_dst=192.168.0.1,nw_tos=0,tp_src=1,tp_dst=1 actions=output:3
+
+
+
